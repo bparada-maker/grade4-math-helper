@@ -5,6 +5,57 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Drill — William's Math Helper</title>
   <link rel="stylesheet" href="css/style.css">
+  <style>
+    /* Multiple choice options */
+    .mc-options {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem;
+      margin-top: 1rem;
+    }
+    .mc-btn {
+      background: var(--card2);
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      padding: 0.9rem 1rem;
+      font-size: 1.2rem; font-weight: 700; color: var(--white);
+      cursor: pointer; transition: all 0.15s;
+      text-align: center;
+    }
+    .mc-btn:hover:not(:disabled) {
+      border-color: var(--blue); background: rgba(21,101,192,0.15);
+      transform: translateY(-1px);
+    }
+    .mc-btn.correct { border-color: var(--success) !important; background: rgba(0,200,83,0.2) !important; color: var(--success); }
+    .mc-btn.wrong   { border-color: var(--error)   !important; background: rgba(255,23,68,0.2)  !important; color: var(--error); }
+    .mc-btn:disabled { cursor: not-allowed; }
+
+    /* PEMDAS label */
+    .q-type-label {
+      display: inline-flex; align-items: center; gap: 0.35rem;
+      font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+      padding: 0.2rem 0.6rem; border-radius: 999px;
+      margin-bottom: 0.75rem;
+    }
+    .q-type-label.typed { background: rgba(21,101,192,0.2); color: var(--blue-lt); border: 1px solid rgba(21,101,192,0.3); }
+    .q-type-label.mc    { background: rgba(156,39,176,0.2); color: #CE93D8;        border: 1px solid rgba(156,39,176,0.3); }
+
+    /* Score breakdown on results */
+    .breakdown {
+      display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;
+      margin: 1rem 0;
+    }
+    .breakdown-item { text-align: center; }
+    .breakdown-item .bd-num { font-size: 1.5rem; font-weight: 800; }
+    .breakdown-item .bd-lbl { font-size: 0.75rem; color: var(--dim); }
+
+    /* Pass/Fail pill */
+    .result-pill {
+      display: inline-block; padding: 0.4rem 1.25rem;
+      border-radius: 999px; font-weight: 800; font-size: 1rem;
+      margin-bottom: 0.5rem;
+    }
+    .result-pill.pass { background: rgba(0,200,83,0.2); color: var(--success); border: 1px solid var(--success); }
+    .result-pill.fail { background: rgba(255,23,68,0.15); color: var(--error); border: 1px solid var(--error); }
+  </style>
 </head>
 <body>
 
@@ -13,7 +64,7 @@
       <span class="spider-icon">🕷️</span> Math Helper
     </a>
     <div class="nav-right">
-      <span class="user-chip" id="drill-title">Drill</span>
+      <span class="user-chip" id="header-label">Drill</span>
       <button class="btn btn-ghost btn-sm" onclick="location.href='dashboard.html'">← Back</button>
     </div>
   </header>
@@ -23,36 +74,45 @@
     <!-- INTRO SCREEN -->
     <div id="screen-intro">
       <div class="card card-glow-red drill-intro">
-        <div class="big-op" id="intro-op"></div>
+        <div class="big-op" id="intro-icon">🕷️</div>
         <h2 id="intro-title"></h2>
-        <p id="intro-desc" style="margin:0.75rem 0 2rem"></p>
+        <p id="intro-desc" style="margin:0.5rem 0 0.25rem"></p>
+        <p id="intro-pass" style="margin:0 0 2rem; font-size:0.85rem"></p>
         <button class="btn btn-primary btn-lg" id="start-btn">🕷️ Start Drill!</button>
       </div>
     </div>
 
-    <!-- ACTIVE DRILL SCREEN -->
+    <!-- ACTIVE DRILL -->
     <div id="screen-drill" class="hidden">
-
       <div class="drill-header">
-        <span class="q-counter" id="q-counter">Question 1 of 12</span>
-        <span class="timer" id="timer">0s</span>
+        <span class="q-counter" id="q-counter">Question 1 of 20</span>
+        <span class="timer" id="timer">0:00</span>
       </div>
-
       <div class="progress-bar-wrap" style="margin-bottom:1rem">
         <div class="progress-bar-fill" id="progress-fill" style="width:0%"></div>
       </div>
 
       <div class="question-card" id="question-card">
-        <div class="question-text" id="question-text">3 × 4 = ?</div>
-        <div class="answer-row">
-          <input type="number" class="answer-input" id="answer-input"
-                 placeholder="?" autocomplete="off" inputmode="numeric">
-          <span class="feedback-icon" id="feedback-icon"></span>
+        <!-- type label -->
+        <div id="q-type-label" class="q-type-label typed">✏️ Type your answer</div>
+
+        <div class="question-text" id="question-text"></div>
+
+        <!-- Typed answer (mult / div) -->
+        <div class="answer-row" id="typed-row">
+          <input type="number" class="answer-input" id="answer-input" placeholder="?" autocomplete="off" inputmode="numeric">
+          <span class="feedback-icon" id="feedback-typed"></span>
           <button class="btn btn-primary" id="check-btn">Check</button>
+        </div>
+
+        <!-- Multiple choice (PEMDAS) -->
+        <div id="mc-row" class="hidden">
+          <div class="mc-options" id="mc-options"></div>
+          <span class="feedback-icon" id="feedback-mc" style="display:block;text-align:center;margin-top:0.5rem"></span>
         </div>
       </div>
 
-      <!-- Cheatsheet (shown after wrong answer) -->
+      <!-- Cheatsheet / explanation -->
       <div id="cheatsheet-panel" class="hidden">
         <div class="cheatsheet">
           <h3>💡 <span id="cs-title"></span></h3>
@@ -61,29 +121,33 @@
           <ul class="cs-examples" id="cs-examples"></ul>
           <div class="cs-trick" id="cs-trick"></div>
         </div>
-        <div style="text-align:center; margin-top:0.75rem">
+        <div style="text-align:center;margin-top:0.75rem">
           <button class="btn btn-secondary" id="next-btn">Got it — Next Question →</button>
         </div>
       </div>
-
     </div>
 
     <!-- RESULTS SCREEN -->
     <div id="screen-results" class="hidden">
       <div class="card results">
-        <h2 id="results-title">Drill Complete! 🕷️</h2>
+        <div class="result-pill" id="result-pill"></div>
+        <h2 id="results-title" style="margin-bottom:0.5rem"></h2>
         <div class="score-display" id="results-score"></div>
         <div class="score-label" id="results-label"></div>
-        <div class="time-display" id="results-time"></div>
+        <div class="time-display" id="results-time" style="margin-bottom:0.75rem"></div>
 
-        <div class="new-badges hidden" id="new-badges-section">
-          <h3>🏆 New Badge Unlocked!</h3>
-          <div id="new-badges-list"></div>
+        <div class="breakdown" id="results-breakdown"></div>
+
+        <div class="new-badges hidden" id="new-badges-section" style="margin:1rem 0">
+          <h3>🏆 Badge Unlocked!</h3>
+          <div id="new-badges-list" style="margin-top:0.5rem"></div>
         </div>
+
+        <div id="fail-msg" class="hidden" style="color:var(--warning);font-size:0.9rem;margin:0.75rem 0"></div>
 
         <div class="result-actions">
           <button class="btn btn-primary" id="retry-btn">Try Again</button>
-          <a href="dashboard.html" class="btn btn-ghost">Back to Dashboard</a>
+          <a href="dashboard.html" class="btn btn-ghost">Dashboard</a>
         </div>
       </div>
     </div>
@@ -95,141 +159,180 @@
   <script>
     if (!requireAuth('william')) { /* redirected */ }
 
-    // ── Parse URL params ───────────────────────────────────────────────────────
+    // ── Parse block from URL ───────────────────────────────────────────────────
     const params    = new URLSearchParams(location.search);
-    const drillType = params.get('type') || 'multiply';  // 'multiply' | 'divide'
-    const drillNum  = parseInt(params.get('by') || '1', 10);
-    const drillKey  = `${drillType}_${drillNum}`;
-    const symbol    = drillType === 'multiply' ? '×' : '÷';
+    const blockId   = parseInt(params.get('block') || '1', 10);
+    const block     = BLOCKS.find(b => b.id === blockId);
 
-    // ── Questions ──────────────────────────────────────────────────────────────
-    const allQuestions = DRILL_QUESTIONS[drillKey] || [];
-    let questions = [];   // shuffled copy
-    let currentIdx  = 0;
-    let correctCount = 0;
-    let startTime, timerInterval, elapsedSeconds = 0;
-    let waitingForNext = false;
+    if (!block) { location.href = 'dashboard.html'; }
+
+    document.getElementById('header-label').textContent = block.name;
 
     // ── Intro screen ───────────────────────────────────────────────────────────
-    const titleText = drillType === 'multiply'
-      ? `Multiply by ${drillNum}`
-      : `Divide by ${drillNum}`;
+    const prev    = getProgress().blockData?.[String(blockId)];
+    const pemTotal = block.pemdas.l1 + block.pemdas.l2 + block.pemdas.l3;
+    const mathTotal = block.total - pemTotal;
 
-    document.getElementById('drill-title').textContent = `${symbol}${drillNum} Drill`;
-    document.getElementById('intro-op').textContent    = `${symbol}${drillNum}`;
-    document.getElementById('intro-title').textContent = titleText;
+    document.getElementById('intro-title').textContent = block.name;
+    document.getElementById('intro-desc').textContent  = block.desc;
 
-    const prev = getProgress().scores?.[drillKey];
-    const prevMsg = prev
-      ? `Your best score is ${prev.best}/12 (${Math.round((prev.best/12)*100)}%). Can you beat it?`
-      : 'First time here! 12 questions. Type your answer and press Enter or Check.';
-    document.getElementById('intro-desc').textContent = prevMsg;
+    let contentLine = `${mathTotal} math questions`;
+    if (pemTotal) contentLine += ` + ${pemTotal} Order of Operations (multiple choice)`;
+    document.getElementById('intro-pass').textContent =
+      `${contentLine} · Pass: ${block.pass}/${block.total} correct · ${
+        prev ? `Your best: ${prev.bestScore}/${block.total} in ${prev.attempts} ${prev.attempts===1?'try':'tries'}` : 'First attempt!'
+      }`;
 
     document.getElementById('start-btn').addEventListener('click', startDrill);
 
-    // ── Start drill ────────────────────────────────────────────────────────────
+    // ── Drill state ───────────────────────────────────────────────────────────
+    let questions    = [];
+    let currentIdx   = 0;
+    let correctCount = 0;
+    let mathCorrect  = 0;
+    let pemCorrect   = 0;
+    let startTime, timerInterval, elapsed = 0;
+    let waitingNext  = false;
+
+    // ── Start ─────────────────────────────────────────────────────────────────
     function startDrill() {
-      // Shuffle questions
-      questions = [...allQuestions].sort(() => Math.random() - 0.5);
+      questions    = generateBlockQuestions(block);
       currentIdx   = 0;
       correctCount = 0;
-      elapsedSeconds = 0;
-      waitingForNext = false;
+      mathCorrect  = 0;
+      pemCorrect   = 0;
+      elapsed      = 0;
+      waitingNext  = false;
 
       document.getElementById('screen-intro').classList.add('hidden');
       document.getElementById('screen-drill').classList.remove('hidden');
 
       startTime = Date.now();
       timerInterval = setInterval(() => {
-        elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
-        document.getElementById('timer').textContent = formatTime(elapsedSeconds);
-      }, 1000);
+        elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const m = Math.floor(elapsed/60), s = elapsed%60;
+        document.getElementById('timer').textContent = `${m}:${String(s).padStart(2,'0')}`;
+      }, 500);
 
       showQuestion();
-      document.getElementById('answer-input').focus();
     }
 
-    // ── Show current question ──────────────────────────────────────────────────
+    // ── Show question ─────────────────────────────────────────────────────────
     function showQuestion() {
-      const q = questions[currentIdx];
-      document.getElementById('q-counter').textContent = `Question ${currentIdx + 1} of ${questions.length}`;
-      document.getElementById('question-text').textContent = `${q.a} ${q.op} ${q.b} = ?`;
-      document.getElementById('progress-fill').style.width = `${(currentIdx / questions.length) * 100}%`;
-
+      const q    = questions[currentIdx];
       const card = document.getElementById('question-card');
       card.className = 'question-card';
+      waitingNext = false;
 
-      const input = document.getElementById('answer-input');
-      input.value = '';
-      input.disabled = false;
-      input.style.borderColor = '';
-      input.focus();
-
-      document.getElementById('feedback-icon').style.display = 'none';
+      document.getElementById('q-counter').textContent = `Question ${currentIdx+1} of ${questions.length}`;
+      document.getElementById('progress-fill').style.width = `${(currentIdx/questions.length)*100}%`;
+      document.getElementById('question-text').textContent = `${q.display} = ?`;
       document.getElementById('cheatsheet-panel').classList.add('hidden');
-      waitingForNext = false;
+
+      if (q.type === 'typed') {
+        document.getElementById('q-type-label').className = 'q-type-label typed';
+        document.getElementById('q-type-label').textContent = '✏️ Type your answer';
+        document.getElementById('typed-row').classList.remove('hidden');
+        document.getElementById('mc-row').classList.add('hidden');
+
+        const input = document.getElementById('answer-input');
+        input.value = ''; input.disabled = false;
+        input.style.borderColor = '';
+        document.getElementById('feedback-typed').style.display = 'none';
+        input.focus();
+      } else {
+        document.getElementById('q-type-label').className = 'q-type-label mc';
+        document.getElementById('q-type-label').textContent = '🧮 Order of Operations — pick one';
+        document.getElementById('typed-row').classList.add('hidden');
+        document.getElementById('mc-row').classList.remove('hidden');
+        document.getElementById('feedback-mc').textContent = '';
+
+        // Build shuffled options (always has correct answer)
+        const shuffledOpts = shuffle([...q.opts]);
+        const container = document.getElementById('mc-options');
+        container.innerHTML = '';
+        shuffledOpts.forEach(opt => {
+          const btn = document.createElement('button');
+          btn.className = 'mc-btn';
+          btn.textContent = opt;
+          btn.addEventListener('click', () => checkMC(btn, opt, q.answer, shuffledOpts, container));
+          container.appendChild(btn);
+        });
+      }
     }
 
-    // ── Check answer ───────────────────────────────────────────────────────────
-    function checkAnswer() {
-      if (waitingForNext) return;
-
-      const input  = document.getElementById('answer-input');
-      const val    = input.value.trim();
-      if (val === '') return;
+    // ── Check typed answer ────────────────────────────────────────────────────
+    function checkTyped() {
+      if (waitingNext) return;
+      const q     = questions[currentIdx];
+      const input = document.getElementById('answer-input');
+      const val   = input.value.trim();
+      if (!val) return;
 
       const guess = parseInt(val, 10);
-      const q     = questions[currentIdx];
+      const icon  = document.getElementById('feedback-typed');
       const card  = document.getElementById('question-card');
-      const icon  = document.getElementById('feedback-icon');
-
       input.disabled = true;
 
       if (guess === q.answer) {
-        // ✅ Correct
-        correctCount++;
+        correctCount++; mathCorrect++;
         card.className = 'question-card correct';
-        icon.textContent = '✅';
-        icon.style.display = 'block';
+        icon.textContent = '✅'; icon.style.display = 'block';
         input.style.borderColor = 'var(--success)';
-
-        setTimeout(() => {
-          currentIdx++;
-          if (currentIdx < questions.length) {
-            showQuestion();
-          } else {
-            finishDrill();
-          }
-        }, 900);
-
+        setTimeout(advance, 900);
       } else {
-        // ❌ Wrong
         card.className = 'question-card wrong';
-        icon.textContent = '❌';
-        icon.style.display = 'block';
+        icon.textContent = '❌'; icon.style.display = 'block';
         input.style.borderColor = 'var(--error)';
-        waitingForNext = true;
+        waitingNext = true;
         showCheatsheet(q);
       }
     }
 
-    document.getElementById('check-btn').addEventListener('click', checkAnswer);
+    document.getElementById('check-btn').addEventListener('click', checkTyped);
     document.getElementById('answer-input').addEventListener('keypress', e => {
-      if (e.key === 'Enter') checkAnswer();
+      if (e.key === 'Enter') checkTyped();
     });
 
-    // ── Cheatsheet ─────────────────────────────────────────────────────────────
+    // ── Check MC answer (PEMDAS) ──────────────────────────────────────────────
+    function checkMC(clickedBtn, selected, correct, opts, container) {
+      if (waitingNext) return;
+      waitingNext = true;
+      const q    = questions[currentIdx];
+      const card = document.getElementById('question-card');
+
+      // Disable all buttons, highlight right/wrong
+      container.querySelectorAll('.mc-btn').forEach(btn => {
+        btn.disabled = true;
+        const val = parseInt(btn.textContent, 10);
+        if (val === correct) btn.classList.add('correct');
+      });
+
+      if (selected === correct) {
+        correctCount++; pemCorrect++;
+        card.className = 'question-card correct';
+        document.getElementById('feedback-mc').textContent = '✅ Correct!';
+        setTimeout(advance, 1200);
+      } else {
+        clickedBtn.classList.add('wrong');
+        card.className = 'question-card wrong';
+        document.getElementById('feedback-mc').textContent = '❌ Not quite — see the tip below!';
+        showCheatsheet(q);
+      }
+    }
+
+    // ── Cheatsheet ────────────────────────────────────────────────────────────
     function showCheatsheet(q) {
-      const cs = CHEATSHEETS[drillType]?.[drillNum];
-      if (!cs) return;
+      const cs = q.type === 'mc'
+        ? CHEATSHEETS.pemdas
+        : CHEATSHEETS[q.hint];
 
-      // Show the correct answer
-      document.getElementById('cs-answer').textContent =
-        `The answer is: ${q.a} ${q.op} ${q.b} = ${q.answer}`;
+      if (!cs) { document.getElementById('cheatsheet-panel').classList.remove('hidden'); return; }
 
-      document.getElementById('cs-title').textContent     = cs.title;
-      document.getElementById('cs-tip').textContent       = cs.tip;
-      document.getElementById('cs-trick').textContent     = cs.trick;
+      document.getElementById('cs-answer').textContent = `The answer is: ${q.display} = ${q.answer}`;
+      document.getElementById('cs-title').textContent  = cs.title;
+      document.getElementById('cs-tip').textContent    = cs.tip;
+      document.getElementById('cs-trick').textContent  = cs.trick;
 
       const exList = document.getElementById('cs-examples');
       exList.innerHTML = '';
@@ -242,36 +345,62 @@
       document.getElementById('cheatsheet-panel').classList.remove('hidden');
     }
 
-    document.getElementById('next-btn').addEventListener('click', () => {
+    document.getElementById('next-btn').addEventListener('click', advance);
+
+    // ── Advance to next question ───────────────────────────────────────────────
+    function advance() {
       currentIdx++;
       if (currentIdx < questions.length) {
         showQuestion();
       } else {
         finishDrill();
       }
-    });
+    }
 
-    // ── Finish drill ───────────────────────────────────────────────────────────
+    // ── Finish ────────────────────────────────────────────────────────────────
     function finishDrill() {
       clearInterval(timerInterval);
-
       document.getElementById('screen-drill').classList.add('hidden');
       document.getElementById('screen-results').classList.remove('hidden');
 
-      const pct   = scorePercent(correctCount, questions.length);
-      const color = scoreColor(correctCount, questions.length);
+      const passed = correctCount >= block.pass;
+      const pct    = Math.round((correctCount / block.total) * 100);
 
-      document.getElementById('results-score').textContent = `${correctCount}/12`;
-      document.getElementById('results-score').className = `score-display score-${color}`;
-      document.getElementById('results-label').textContent = `${pct}% — ${getMessage(pct)}`;
-      document.getElementById('results-time').textContent  = `Time: ${formatTime(elapsedSeconds)}`;
-      document.getElementById('results-title').textContent = getTitle(pct);
+      // Pill
+      const pill = document.getElementById('result-pill');
+      pill.textContent = passed ? '✅ PASSED' : '❌ Not Yet';
+      pill.className   = `result-pill ${passed ? 'pass' : 'fail'}`;
+
+      // Title & score
+      document.getElementById('results-title').textContent = passed ? getWinTitle(pct) : '💪 Keep Going!';
+      document.getElementById('results-score').textContent = `${correctCount}/${block.total}`;
+      document.getElementById('results-score').className   = `score-display score-${correctCount===block.total?'gold':pct>=75?'great':pct>=60?'ok':'low'}`;
+      document.getElementById('results-label').textContent = `${pct}% — ${getMsg(pct, passed)}`;
+      document.getElementById('results-time').textContent  = `Time: ${formatTime(elapsed)}`;
+
+      // Breakdown
+      const pemTotal = block.pemdas.l1 + block.pemdas.l2 + block.pemdas.l3;
+      const mathTotal = block.total - pemTotal;
+      const bd = document.getElementById('results-breakdown');
+      if (pemTotal > 0) {
+        bd.innerHTML = `
+          <div class="breakdown-item"><div class="bd-num">${mathCorrect}/${mathTotal}</div><div class="bd-lbl">Math</div></div>
+          <div class="breakdown-item"><div class="bd-num">${pemCorrect}/${pemTotal}</div><div class="bd-lbl">Order of Ops</div></div>
+        `;
+      }
+
+      // Fail message
+      if (!passed) {
+        const failEl = document.getElementById('fail-msg');
+        failEl.classList.remove('hidden');
+        const needed = block.pass - correctCount;
+        failEl.textContent = `You need ${block.pass}/${block.total} to pass. You were ${needed} away — you've got this! Try again with a fresh shuffle.`;
+      }
 
       // Save and check badges
-      const newBadges = saveDrillResult(drillKey, correctCount);
+      const { newBadges } = saveBlockResult(blockId, correctCount, elapsed, block.pass);
       if (newBadges.length > 0) {
-        const section = document.getElementById('new-badges-section');
-        section.classList.remove('hidden');
+        document.getElementById('new-badges-section').classList.remove('hidden');
         const list = document.getElementById('new-badges-list');
         newBadges.forEach(b => {
           const div = document.createElement('div');
@@ -287,19 +416,17 @@
       });
     }
 
-    function getMessage(pct) {
-      if (pct === 100) return 'PERFECT! Victory Royale! 🏆';
-      if (pct >= 90)   return 'Amazing — Spider Sense is tingling! 🕷️';
-      if (pct >= 70)   return 'Good work! Keep practicing!';
-      if (pct >= 50)   return 'Getting there! Check the cheatsheet tips.';
-      return 'Keep going — you\'ll get it! 💪';
+    function getWinTitle(pct) {
+      if (pct === 100) return '🏆 PERFECT SCORE!';
+      if (pct >= 90)   return '🕷️ Amazing, William!';
+      return '✅ Block Passed!';
     }
-
-    function getTitle(pct) {
-      if (pct === 100) return '🏆 Perfect Score!';
-      if (pct >= 90)   return '🕷️ Great Job, William!';
-      if (pct >= 70)   return '👍 Nice Work!';
-      return '💪 Keep Practicing!';
+    function getMsg(pct, passed) {
+      if (pct === 100) return 'VICTORY ROYALE! 💥';
+      if (passed && pct >= 90) return 'Spider Sense is tingling! 🕷️';
+      if (passed) return 'Block cleared! Next one awaits.';
+      if (pct >= 60) return 'So close! Check the cheatsheets and retry.';
+      return 'Review the tips and give it another shot!';
     }
   </script>
 </body>

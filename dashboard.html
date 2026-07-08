@@ -5,6 +5,68 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard — William's Math Helper</title>
   <link rel="stylesheet" href="css/style.css">
+  <style>
+    /* Block progression map */
+    .block-map {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 0.6rem;
+      margin: 0.75rem 0 1.5rem;
+    }
+    .block-tile {
+      background: var(--card2);
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      padding: 0.75rem 0.5rem;
+      text-align: center;
+      cursor: pointer;
+      text-decoration: none;
+      color: var(--white);
+      transition: all 0.15s;
+      display: flex; flex-direction: column; align-items: center; gap: 0.2rem;
+      position: relative;
+    }
+    .block-tile:hover:not(.locked) { transform: translateY(-2px); text-decoration: none; }
+    .block-tile .b-num  { font-size: 0.7rem; color: var(--dim); font-weight: 600; text-transform: uppercase; }
+    .block-tile .b-icon { font-size: 1.4rem; line-height: 1; }
+    .block-tile .b-score { font-size: 0.7rem; font-weight: 700; }
+    .block-tile .b-tries { font-size: 0.65rem; color: var(--dim); }
+
+    /* States */
+    .block-tile.passed  { border-color: var(--success); background: rgba(0,200,83,0.08); }
+    .block-tile.passed  .b-score { color: var(--success); }
+    .block-tile.perfect { border-color: var(--gold); background: rgba(255,215,0,0.08); box-shadow: 0 0 12px rgba(255,215,0,0.2); }
+    .block-tile.perfect .b-score { color: var(--gold); }
+    .block-tile.current { border-color: var(--red); background: rgba(226,54,54,0.1); animation: pulse-border 2s ease-in-out infinite; }
+    .block-tile.current .b-score { color: var(--red); }
+    .block-tile.failing { border-color: var(--warning); background: rgba(255,152,0,0.08); }
+    .block-tile.failing .b-score { color: var(--warning); }
+    .block-tile.locked  { opacity: 0.35; cursor: not-allowed; pointer-events: none; }
+
+    @keyframes pulse-border {
+      0%,100% { box-shadow: 0 0 0 0 rgba(226,54,54,0.4); }
+      50%      { box-shadow: 0 0 0 5px rgba(226,54,54,0); }
+    }
+
+    /* Today banner */
+    .today-banner {
+      border-radius: 14px; padding: 1.25rem 1.5rem;
+      display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+      flex-wrap: wrap; margin-bottom: 1.5rem;
+    }
+    .today-banner.ready  { background: rgba(226,54,54,0.08); border: 1px solid rgba(226,54,54,0.35); }
+    .today-banner.done   { background: rgba(0,200,83,0.07); border: 1px solid rgba(0,200,83,0.3); }
+    .today-banner h2     { font-size: 1rem; margin-bottom: 0.15rem; }
+    .today-banner p      { font-size: 0.85rem; color: var(--dim); margin: 0; }
+    .banner-actions      { display: flex; gap: 0.5rem; flex-shrink: 0; }
+
+    @media (max-width: 640px) {
+      .block-map { grid-template-columns: repeat(4, 1fr); }
+    }
+    @media (max-width: 440px) {
+      .block-map { grid-template-columns: repeat(3, 1fr); }
+    }
+  </style>
 </head>
 <body>
 
@@ -20,19 +82,24 @@
 
   <div class="page-content">
 
-    <!-- Stats Row -->
-    <div class="stats-row" id="stats-row">
+    <!-- Today's drill banner -->
+    <div class="today-banner" id="today-banner">
+      <!-- filled by JS -->
+    </div>
+
+    <!-- Stats row -->
+    <div class="stats-row">
       <div class="stat-card card-glow-red">
-        <span class="stat-num" id="stat-completed">0</span>
-        <span class="stat-label">Drills Completed</span>
+        <span class="stat-num" id="stat-passed">0</span>
+        <span class="stat-label">Blocks Passed</span>
       </div>
-      <div class="stat-card">
+      <div class="stat-card card-glow-gold">
         <span class="stat-num" id="stat-perfect">0</span>
         <span class="stat-label">Perfect Scores 💥</span>
       </div>
-      <div class="stat-card card-glow-gold">
+      <div class="stat-card">
         <span class="stat-num" id="stat-badges">0</span>
-        <span class="stat-label">Badges Earned 🏆</span>
+        <span class="stat-label">Badges 🏆</span>
       </div>
       <div class="stat-card">
         <span class="stat-num" id="stat-days">0</span>
@@ -40,27 +107,26 @@
       </div>
     </div>
 
-    <!-- Focus / Struggling Section -->
-    <div id="focus-section" class="focus-banner hidden">
-      <h3>🎯 Keep Working On These:</h3>
-      <ul class="focus-list" id="focus-list"></ul>
+    <!-- Progress bar -->
+    <div style="margin-bottom:1.5rem">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem">
+        <span style="font-size:0.8rem;color:var(--dim);text-transform:uppercase;letter-spacing:0.5px">Overall Progress</span>
+        <span style="font-size:0.8rem;color:var(--dim)" id="progress-label">0 / 20 blocks</span>
+      </div>
+      <div class="progress-bar-wrap">
+        <div class="progress-bar-fill" id="progress-fill" style="width:0%"></div>
+      </div>
     </div>
 
-    <!-- Multiplication Drills -->
+    <!-- Block map -->
     <div class="section-header">
-      <h2>✖️ Multiplication Drills</h2>
-      <span class="text-dim" style="font-size:0.8rem">Click any to practice</span>
+      <h2>🗺️ Block Map</h2>
+      <span class="text-dim" style="font-size:0.8rem">One block per day — complete them in order</span>
     </div>
-    <div class="drill-grid" id="mult-grid"></div>
-
-    <!-- Division Drills -->
-    <div class="section-header">
-      <h2>➗ Division Drills</h2>
-    </div>
-    <div class="drill-grid" id="div-grid"></div>
+    <div class="block-map" id="block-map"></div>
 
     <!-- Badges -->
-    <div class="section-header" style="margin-top:2rem">
+    <div class="section-header" style="margin-top:1rem">
       <h2>🏆 Badges</h2>
     </div>
     <div class="badge-grid" id="badge-grid"></div>
@@ -72,65 +138,91 @@
   <script>
     if (!requireAuth('william')) { /* redirected */ }
 
-    const progress = getProgress();
+    const p      = getProgress();
+    const blocks = p.blockData || {};
+    const doneToday = isDoneToday();
+
+    // ── Today banner ──────────────────────────────────────────────────────────
+    const cur = p.currentBlock;
+    const curBlock = BLOCKS.find(b => b.id === cur);
+    const banner = document.getElementById('today-banner');
+
+    if (doneToday) {
+      const bd = blocks[String(cur - (blocks[String(cur)]?.passed ? 0 : 1))] || {};
+      banner.className = 'today-banner done';
+      banner.innerHTML = `
+        <div>
+          <h2>✅ Great work today, William!</h2>
+          <p>You've done your drill. Come back tomorrow for the next one!</p>
+        </div>
+        <div class="banner-actions">
+          <a href="drill.html?block=${cur}" class="btn btn-ghost btn-sm">Keep Going Anyway</a>
+        </div>
+      `;
+    } else {
+      const prevData = blocks[String(cur)];
+      const attemptsMsg = prevData
+        ? `Attempts: ${prevData.attempts} — Best: ${prevData.bestScore}/20`
+        : 'First time on this block!';
+      banner.className = 'today-banner ready';
+      banner.innerHTML = `
+        <div>
+          <h2>🕷️ Today's Drill — ${curBlock?.name || 'Block ' + cur}</h2>
+          <p>${curBlock?.desc || ''} &nbsp;·&nbsp; ${attemptsMsg}</p>
+        </div>
+        <div class="banner-actions">
+          <a href="drill.html?block=${cur}" class="btn btn-primary">Start Drill!</a>
+        </div>
+      `;
+    }
 
     // ── Stats ─────────────────────────────────────────────────────────────────
-    const scores = progress.scores || {};
-    const completed = Object.keys(scores).length;
-    const perfect   = Object.values(scores).filter(s => s.best === 12).length;
-    const badges    = (progress.badges || []).length;
-    const days      = (progress.practiceDays || []).length;
+    const passed  = Object.values(blocks).filter(b => b.passed).length;
+    const perfect = Object.values(blocks).filter(b => b.bestScore === 20).length;
+    document.getElementById('stat-passed').textContent  = `${passed}/20`;
+    document.getElementById('stat-perfect').textContent = perfect;
+    document.getElementById('stat-badges').textContent  = (p.badges||[]).length;
+    document.getElementById('stat-days').textContent    = (p.practiceDays||[]).length;
+    document.getElementById('progress-label').textContent = `${passed} / 20 blocks`;
+    document.getElementById('progress-fill').style.width = `${(passed / 20) * 100}%`;
 
-    document.getElementById('stat-completed').textContent = `${completed}/24`;
-    document.getElementById('stat-perfect').textContent   = perfect;
-    document.getElementById('stat-badges').textContent    = badges;
-    document.getElementById('stat-days').textContent      = days;
+    // ── Block map ─────────────────────────────────────────────────────────────
+    const map = document.getElementById('block-map');
+    BLOCKS.forEach(block => {
+      const bd       = blocks[String(block.id)];
+      const isCur    = block.id === cur;
+      const isLocked = block.id > cur;
+      const isPassed = bd?.passed;
+      const isPerfect = bd?.bestScore === 20;
+      const isFailing = !isPassed && bd?.attempts > 0;
 
-    // ── Focus section (drills with score < 70%) ────────────────────────────────
-    const struggling = Object.entries(scores)
-      .filter(([, s]) => (s.best / 12) < 0.7)
-      .map(([k, s]) => ({ key: k, best: s.best }));
+      let cls = 'block-tile ';
+      if (isLocked)       cls += 'locked';
+      else if (isPerfect) cls += 'perfect';
+      else if (isPassed)  cls += 'passed';
+      else if (isCur)     cls += 'current';
+      else if (isFailing) cls += 'failing';
 
-    if (struggling.length > 0) {
-      document.getElementById('focus-section').classList.remove('hidden');
-      const list = document.getElementById('focus-list');
-      struggling.slice(0, 6).forEach(({ key, best }) => {
-        const [type, n] = key.split('_');
-        const symbol = type === 'multiply' ? '×' : '÷';
-        const pct = Math.round((best / 12) * 100);
-        const li = document.createElement('li');
-        li.innerHTML = `<a href="drill.html?type=${type}&by=${n}">${symbol}${n} &nbsp;(${pct}%)</a>`;
-        list.appendChild(li);
-      });
-    }
+      let icon  = isLocked ? '🔒' : isPerfect ? '⭐' : isPassed ? '✅' : isCur ? '🕷️' : '❌';
+      let score = bd ? `${bd.bestScore}/20` : (isLocked ? '—' : 'New');
+      let tries = bd?.attempts ? `${bd.attempts} ${bd.attempts === 1 ? 'try' : 'tries'}` : '';
 
-    // ── Drill card builder ────────────────────────────────────────────────────
-    function buildDrillGrid(containerId, type, symbol) {
-      const grid = document.getElementById(containerId);
-      for (let n = 1; n <= 12; n++) {
-        const key = `${type}_${n}`;
-        const s   = scores[key];
-        const pct = s ? Math.round((s.best / 12) * 100) : null;
-        const cls = s ? scoreColor(s.best, 12) : 'none';
-
-        const a = document.createElement('a');
-        a.href = `drill.html?type=${type}&by=${n}`;
-        a.className = `drill-card score-${cls}`;
-        a.innerHTML = `
-          <span class="drill-label">${symbol}${n}</span>
-          <span class="drill-score">${pct !== null ? pct + '%' : 'New'}</span>
-        `;
-        grid.appendChild(a);
-      }
-    }
-
-    buildDrillGrid('mult-grid', 'multiply', '×');
-    buildDrillGrid('div-grid',  'divide',   '÷');
+      const tile = document.createElement(isLocked ? 'div' : 'a');
+      tile.className = cls;
+      if (!isLocked) tile.href = `drill.html?block=${block.id}`;
+      tile.innerHTML = `
+        <span class="b-num">${block.name}</span>
+        <span class="b-icon">${icon}</span>
+        <span class="b-score">${score}</span>
+        ${tries ? `<span class="b-tries">${tries}</span>` : ''}
+      `;
+      map.appendChild(tile);
+    });
 
     // ── Badges ────────────────────────────────────────────────────────────────
     const badgeGrid = document.getElementById('badge-grid');
     BADGES.forEach(badge => {
-      const earned = (progress.badges || []).includes(badge.id);
+      const earned = (p.badges||[]).includes(badge.id);
       const div = document.createElement('div');
       div.className = `badge-tile ${earned ? 'earned' : 'locked'}`;
       div.innerHTML = `
@@ -143,8 +235,7 @@
 
     // ── Logout ────────────────────────────────────────────────────────────────
     document.getElementById('logout-btn').addEventListener('click', () => {
-      clearSession();
-      location.href = 'index.html';
+      clearSession(); location.href = 'index.html';
     });
   </script>
 </body>

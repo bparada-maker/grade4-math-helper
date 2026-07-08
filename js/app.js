@@ -1,7 +1,7 @@
 // Shared auth, storage, and progress utilities
 
 const STORAGE_KEY = 'grade4_math_helper';
-const DEFAULT_ADMIN_PASS = 'admin2024';
+const DEFAULT_ADMIN_PASS   = 'admin2024';
 const DEFAULT_WILLIAM_PASS = 'spidey1';
 
 // ── STORAGE ───────────────────────────────────────────────────────────────────
@@ -17,109 +17,118 @@ function saveStore(data) {
 
 // ── PASSWORDS ─────────────────────────────────────────────────────────────────
 
-function getAdminPass() {
-  return getStore().adminPass || DEFAULT_ADMIN_PASS;
-}
+function getAdminPass()    { return getStore().adminPass    || DEFAULT_ADMIN_PASS; }
+function getWilliamPass()  { return getStore().williamPass  || DEFAULT_WILLIAM_PASS; }
 
-function getWilliamPass() {
-  return getStore().williamPass || DEFAULT_WILLIAM_PASS;
-}
-
-function setWilliamPass(newPass) {
-  const store = getStore();
-  store.williamPass = newPass;
-  saveStore(store);
-}
-
-function setAdminPass(newPass) {
-  const store = getStore();
-  store.adminPass = newPass;
-  saveStore(store);
-}
+function setWilliamPass(p) { const s = getStore(); s.williamPass = p; saveStore(s); }
+function setAdminPass(p)   { const s = getStore(); s.adminPass   = p; saveStore(s); }
 
 // ── SESSION ───────────────────────────────────────────────────────────────────
 
-function getSession() {
-  return sessionStorage.getItem('math_session'); // 'william' or 'admin'
-}
-
-function setSession(role) {
-  sessionStorage.setItem('math_session', role);
-}
-
-function clearSession() {
-  sessionStorage.removeItem('math_session');
-}
+function getSession()      { return sessionStorage.getItem('math_session'); }
+function setSession(role)  { sessionStorage.setItem('math_session', role); }
+function clearSession()    { sessionStorage.removeItem('math_session'); }
 
 function requireAuth(role) {
-  const session = getSession();
-  if (!session) { window.location.href = 'index.html'; return false; }
-  if (role && session !== role) {
-    window.location.href = session === 'admin' ? 'admin.html' : 'dashboard.html';
-    return false;
-  }
+  const s = getSession();
+  if (!s) { location.href = 'index.html'; return false; }
+  if (role && s !== role) { location.href = s === 'admin' ? 'admin.html' : 'dashboard.html'; return false; }
   return true;
 }
 
 // ── PROGRESS ──────────────────────────────────────────────────────────────────
+// Schema:
+// {
+//   currentBlock: 1,          // highest block unlocked (1-based)
+//   blockData: {
+//     '1': { passed, bestScore, bestTime, attempts, lastDate }
+//   },
+//   badges: [],
+//   practiceDays: [],         // ['2024-07-01', ...]
+//   todayDate: '2024-07-01',
+//   todayDone: false
+// }
 
 function getProgress() {
-  const store = getStore();
-  return store.progress || { scores: {}, badges: [], practiceDays: [] };
+  const s = getStore();
+  return s.progress || {
+    currentBlock: 1,
+    blockData: {},
+    badges: [],
+    practiceDays: [],
+    todayDate: '',
+    todayDone: false
+  };
 }
 
-function saveProgress(progress) {
-  const store = getStore();
-  store.progress = progress;
-  saveStore(store);
+function saveProgress(p) {
+  const s = getStore();
+  s.progress = p;
+  saveStore(s);
 }
 
 function resetProgress() {
-  const store = getStore();
-  store.progress = { scores: {}, badges: [], practiceDays: [] };
-  saveStore(store);
+  const s = getStore();
+  s.progress = { currentBlock: 1, blockData: {}, badges: [], practiceDays: [], todayDate: '', todayDone: false };
+  saveStore(s);
 }
 
-function recordPracticeDay(progress) {
+function isDoneToday() {
+  const p    = getProgress();
   const today = new Date().toISOString().split('T')[0];
-  if (!progress.practiceDays) progress.practiceDays = [];
-  if (!progress.practiceDays.includes(today)) {
-    progress.practiceDays.push(today);
-  }
+  return p.todayDate === today && p.todayDone;
 }
 
-// Save a drill result. Returns array of newly earned badges.
-function saveDrillResult(drillKey, correctCount) {
-  const progress = getProgress();
-  if (!progress.scores) progress.scores = {};
+// Save a block result. Returns { newBadges, passed }.
+function saveBlockResult(blockId, correctCount, elapsedSeconds, passScore) {
+  const p     = getProgress();
+  const key   = String(blockId);
+  const today = new Date().toISOString().split('T')[0];
+  const passed = correctCount >= passScore;
+  const prev   = p.blockData[key] || {};
 
-  const prev = progress.scores[drillKey];
-  progress.scores[drillKey] = {
-    best: Math.max(correctCount, prev?.best ?? 0),
-    lastScore: correctCount,
-    attempts: (prev?.attempts ?? 0) + 1,
-    lastDate: new Date().toISOString().split('T')[0]
+  p.blockData[key] = {
+    passed:    passed || prev.passed || false,  // once passed, stays passed
+    bestScore: Math.max(correctCount, prev.bestScore ?? 0),
+    bestTime:  passed
+      ? (prev.bestTime ? Math.min(elapsedSeconds, prev.bestTime) : elapsedSeconds)
+      : (prev.bestTime ?? null),
+    attempts:  (prev.attempts ?? 0) + 1,
+    lastDate:  today,
+    lastScore: correctCount
   };
 
-  recordPracticeDay(progress);
-  const newBadges = checkAndAwardBadges(progress);
-  saveProgress(progress);
-  return newBadges;
+  // Advance currentBlock if this block was just passed
+  if (passed && blockId === p.currentBlock && blockId < 20) {
+    p.currentBlock = blockId + 1;
+  }
+
+  // Record today's drill (soft lock)
+  p.todayDate = today;
+  p.todayDone = true;
+
+  // Record practice day
+  if (!p.practiceDays.includes(today)) p.practiceDays.push(today);
+
+  // Check badges
+  const newBadges = checkAndAwardBadges(p);
+  saveProgress(p);
+  return { newBadges, passed };
 }
 
 // ── BADGES ────────────────────────────────────────────────────────────────────
 
-function checkAndAwardBadges(progress) {
-  const newBadges = [];
-  if (typeof BADGES === 'undefined') return newBadges;
-  for (const badge of BADGES) {
-    if (!(progress.badges || []).includes(badge.id) && badge.check(progress)) {
-      if (!progress.badges) progress.badges = [];
-      progress.badges.push(badge.id);
-      newBadges.push(badge);
+function checkAndAwardBadges(p) {
+  if (typeof BADGES === 'undefined') return [];
+  const earned = [];
+  for (const b of BADGES) {
+    if (!(p.badges||[]).includes(b.id) && b.check(p)) {
+      if (!p.badges) p.badges = [];
+      p.badges.push(b.id);
+      earned.push(b);
     }
   }
-  return newBadges;
+  return earned;
 }
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
@@ -133,12 +142,7 @@ function scoreColor(correct, total) {
   return 'none';
 }
 
-function scorePercent(correct, total) {
-  return Math.round((correct / total) * 100);
-}
-
-function formatTime(seconds) {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
+function formatTime(sec) {
+  const m = Math.floor(sec / 60), s = sec % 60;
   return m > 0 ? `${m}m ${s}s` : `${s}s`;
 }
