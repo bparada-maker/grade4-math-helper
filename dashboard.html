@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — William's Math Helper</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <a href="dashboard.html" class="logo">
+      <span class="spider-icon">🕷️</span> Math Helper
+    </a>
+    <div class="nav-right">
+      <span class="user-chip">William</span>
+      <button class="btn btn-ghost btn-sm" id="logout-btn">Logout</button>
+    </div>
+  </header>
+
+  <div class="page-content">
+
+    <!-- Stats Row -->
+    <div class="stats-row" id="stats-row">
+      <div class="stat-card card-glow-red">
+        <span class="stat-num" id="stat-completed">0</span>
+        <span class="stat-label">Drills Completed</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-num" id="stat-perfect">0</span>
+        <span class="stat-label">Perfect Scores 💥</span>
+      </div>
+      <div class="stat-card card-glow-gold">
+        <span class="stat-num" id="stat-badges">0</span>
+        <span class="stat-label">Badges Earned 🏆</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-num" id="stat-days">0</span>
+        <span class="stat-label">Practice Days</span>
+      </div>
+    </div>
+
+    <!-- Focus / Struggling Section -->
+    <div id="focus-section" class="focus-banner hidden">
+      <h3>🎯 Keep Working On These:</h3>
+      <ul class="focus-list" id="focus-list"></ul>
+    </div>
+
+    <!-- Multiplication Drills -->
+    <div class="section-header">
+      <h2>✖️ Multiplication Drills</h2>
+      <span class="text-dim" style="font-size:0.8rem">Click any to practice</span>
+    </div>
+    <div class="drill-grid" id="mult-grid"></div>
+
+    <!-- Division Drills -->
+    <div class="section-header">
+      <h2>➗ Division Drills</h2>
+    </div>
+    <div class="drill-grid" id="div-grid"></div>
+
+    <!-- Badges -->
+    <div class="section-header" style="margin-top:2rem">
+      <h2>🏆 Badges</h2>
+    </div>
+    <div class="badge-grid" id="badge-grid"></div>
+
+  </div>
+
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    if (!requireAuth('william')) { /* redirected */ }
+
+    const progress = getProgress();
+
+    // ── Stats ─────────────────────────────────────────────────────────────────
+    const scores = progress.scores || {};
+    const completed = Object.keys(scores).length;
+    const perfect   = Object.values(scores).filter(s => s.best === 12).length;
+    const badges    = (progress.badges || []).length;
+    const days      = (progress.practiceDays || []).length;
+
+    document.getElementById('stat-completed').textContent = `${completed}/24`;
+    document.getElementById('stat-perfect').textContent   = perfect;
+    document.getElementById('stat-badges').textContent    = badges;
+    document.getElementById('stat-days').textContent      = days;
+
+    // ── Focus section (drills with score < 70%) ────────────────────────────────
+    const struggling = Object.entries(scores)
+      .filter(([, s]) => (s.best / 12) < 0.7)
+      .map(([k, s]) => ({ key: k, best: s.best }));
+
+    if (struggling.length > 0) {
+      document.getElementById('focus-section').classList.remove('hidden');
+      const list = document.getElementById('focus-list');
+      struggling.slice(0, 6).forEach(({ key, best }) => {
+        const [type, n] = key.split('_');
+        const symbol = type === 'multiply' ? '×' : '÷';
+        const pct = Math.round((best / 12) * 100);
+        const li = document.createElement('li');
+        li.innerHTML = `<a href="drill.html?type=${type}&by=${n}">${symbol}${n} &nbsp;(${pct}%)</a>`;
+        list.appendChild(li);
+      });
+    }
+
+    // ── Drill card builder ────────────────────────────────────────────────────
+    function buildDrillGrid(containerId, type, symbol) {
+      const grid = document.getElementById(containerId);
+      for (let n = 1; n <= 12; n++) {
+        const key = `${type}_${n}`;
+        const s   = scores[key];
+        const pct = s ? Math.round((s.best / 12) * 100) : null;
+        const cls = s ? scoreColor(s.best, 12) : 'none';
+
+        const a = document.createElement('a');
+        a.href = `drill.html?type=${type}&by=${n}`;
+        a.className = `drill-card score-${cls}`;
+        a.innerHTML = `
+          <span class="drill-label">${symbol}${n}</span>
+          <span class="drill-score">${pct !== null ? pct + '%' : 'New'}</span>
+        `;
+        grid.appendChild(a);
+      }
+    }
+
+    buildDrillGrid('mult-grid', 'multiply', '×');
+    buildDrillGrid('div-grid',  'divide',   '÷');
+
+    // ── Badges ────────────────────────────────────────────────────────────────
+    const badgeGrid = document.getElementById('badge-grid');
+    BADGES.forEach(badge => {
+      const earned = (progress.badges || []).includes(badge.id);
+      const div = document.createElement('div');
+      div.className = `badge-tile ${earned ? 'earned' : 'locked'}`;
+      div.innerHTML = `
+        <span class="badge-emoji">${badge.emoji}</span>
+        <div class="badge-name">${badge.name}</div>
+        <div class="badge-desc">${badge.desc}</div>
+      `;
+      badgeGrid.appendChild(div);
+    });
+
+    // ── Logout ────────────────────────────────────────────────────────────────
+    document.getElementById('logout-btn').addEventListener('click', () => {
+      clearSession();
+      location.href = 'index.html';
+    });
+  </script>
+</body>
+</html>

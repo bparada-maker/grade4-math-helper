@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin — William's Math Helper</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <a href="admin.html" class="logo">
+      <span class="spider-icon">🕷️</span> Math Helper
+    </a>
+    <div class="nav-right">
+      <span class="user-chip">Admin</span>
+      <button class="btn btn-ghost btn-sm" id="logout-btn">Logout</button>
+    </div>
+  </header>
+
+  <div class="page-content">
+
+    <h1 style="margin-bottom:0.25rem">Admin Panel</h1>
+    <p style="margin-bottom:1.5rem">Manage William's progress and account</p>
+
+    <div class="admin-grid">
+
+      <!-- Left column -->
+      <div style="display:flex; flex-direction:column; gap:1.5rem">
+
+        <!-- William's Password -->
+        <div class="card">
+          <div class="admin-section">
+            <h2>William's Password</h2>
+            <p style="font-size:0.85rem; margin-bottom:0.75rem">
+              Change William's login password. Current password is shown below.
+            </p>
+            <div class="pass-display">
+              <input type="password" id="william-pass-display" readonly>
+              <button class="btn btn-ghost btn-sm" id="show-pass-btn">👁 Show</button>
+            </div>
+            <div class="form-group" style="margin-top:0.75rem">
+              <label for="new-william-pass">Set New Password</label>
+              <input type="text" id="new-william-pass" placeholder="New password for William">
+            </div>
+            <button class="btn btn-primary btn-sm" id="save-william-pass">Save Password</button>
+            <div class="error-msg" id="pass-msg" style="color:var(--success); background:rgba(0,200,83,0.1); border-color:var(--success)"></div>
+          </div>
+        </div>
+
+        <!-- Admin Password -->
+        <div class="card">
+          <div class="admin-section">
+            <h2>Admin Password</h2>
+            <p style="font-size:0.85rem; margin-bottom:0.75rem">Change your own admin password.</p>
+            <div class="form-group">
+              <label for="new-admin-pass">New Admin Password</label>
+              <input type="text" id="new-admin-pass" placeholder="New admin password">
+            </div>
+            <button class="btn btn-secondary btn-sm" id="save-admin-pass">Update Admin Password</button>
+            <div class="error-msg" id="admin-pass-msg" style="color:var(--success); background:rgba(0,200,83,0.1); border-color:var(--success)"></div>
+          </div>
+        </div>
+
+        <!-- Danger Zone -->
+        <div class="card danger-zone">
+          <div class="admin-section">
+            <h2>⚠️ Danger Zone</h2>
+            <p style="font-size:0.85rem; margin-bottom:1rem">
+              Reset all of William's scores, badges, and progress. This cannot be undone.
+            </p>
+            <button class="btn btn-danger btn-sm" id="reset-btn">Reset All Progress</button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Right column -->
+      <div style="display:flex; flex-direction:column; gap:1.5rem">
+
+        <!-- Stats summary -->
+        <div class="card">
+          <div class="admin-section">
+            <h2>Progress Summary</h2>
+            <div class="stats-row" style="grid-template-columns:1fr 1fr; margin:0.75rem 0">
+              <div class="stat-card" style="padding:0.75rem">
+                <span class="stat-num" style="font-size:1.5rem" id="a-completed">—</span>
+                <span class="stat-label">Drills Done</span>
+              </div>
+              <div class="stat-card" style="padding:0.75rem">
+                <span class="stat-num" style="font-size:1.5rem" id="a-perfect">—</span>
+                <span class="stat-label">Perfect Scores</span>
+              </div>
+              <div class="stat-card" style="padding:0.75rem">
+                <span class="stat-num" style="font-size:1.5rem" id="a-badges">—</span>
+                <span class="stat-label">Badges</span>
+              </div>
+              <div class="stat-card" style="padding:0.75rem">
+                <span class="stat-num" style="font-size:1.5rem" id="a-days">—</span>
+                <span class="stat-label">Days Practiced</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- All scores table -->
+        <div class="card" style="overflow-x:auto">
+          <div class="admin-section">
+            <h2>All Drill Scores</h2>
+            <table class="scores-table" id="scores-table">
+              <thead>
+                <tr>
+                  <th>Drill</th>
+                  <th>Best</th>
+                  <th>Last</th>
+                  <th>Tries</th>
+                  <th>Last Date</th>
+                </tr>
+              </thead>
+              <tbody id="scores-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    if (!requireAuth('admin')) { /* redirected */ }
+
+    // ── Load data ──────────────────────────────────────────────────────────────
+    function loadAdminData() {
+      const progress = getProgress();
+      const scores   = progress.scores || {};
+
+      // Stats
+      const completed = Object.keys(scores).length;
+      const perfect   = Object.values(scores).filter(s => s.best === 12).length;
+      const badges    = (progress.badges || []).length;
+      const days      = (progress.practiceDays || []).length;
+
+      document.getElementById('a-completed').textContent = `${completed}/24`;
+      document.getElementById('a-perfect').textContent   = perfect;
+      document.getElementById('a-badges').textContent    = badges;
+      document.getElementById('a-days').textContent      = days;
+
+      // Scores table
+      const tbody = document.getElementById('scores-body');
+      tbody.innerHTML = '';
+
+      const allKeys = [
+        ...Array.from({ length: 12 }, (_, i) => `multiply_${i + 1}`),
+        ...Array.from({ length: 12 }, (_, i) => `divide_${i + 1}`)
+      ];
+
+      allKeys.forEach(key => {
+        const s = scores[key];
+        const [type, n] = key.split('_');
+        const symbol = type === 'multiply' ? '×' : '÷';
+        const tr = document.createElement('tr');
+        const pct = s ? Math.round((s.best / 12) * 100) : null;
+        const col = s ? (['score-gold','score-great','score-ok','score-low'][[100,90,70,0].findIndex(t => pct >= t)]) : '';
+
+        tr.innerHTML = `
+          <td><strong>${symbol}${n}</strong></td>
+          <td><span style="font-weight:700;color:${s ? (pct===100?'var(--gold)':pct>=90?'var(--success)':pct>=70?'var(--warning)':'var(--error)') : 'var(--dim)'}">${s ? `${s.best}/12` : '—'}</span></td>
+          <td>${s ? `${s.lastScore}/12` : '—'}</td>
+          <td>${s ? s.attempts : '—'}</td>
+          <td style="color:var(--dim);font-size:0.8rem">${s ? s.lastDate : '—'}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      // Password display
+      document.getElementById('william-pass-display').value = getWilliamPass();
+    }
+
+    loadAdminData();
+
+    // ── Show/hide William's password ──────────────────────────────────────────
+    const passDisplay = document.getElementById('william-pass-display');
+    document.getElementById('show-pass-btn').addEventListener('click', function () {
+      if (passDisplay.type === 'password') {
+        passDisplay.type = 'text';
+        this.textContent = '🙈 Hide';
+      } else {
+        passDisplay.type = 'password';
+        this.textContent = '👁 Show';
+      }
+    });
+
+    // ── Save William's password ────────────────────────────────────────────────
+    document.getElementById('save-william-pass').addEventListener('click', () => {
+      const val = document.getElementById('new-william-pass').value.trim();
+      if (!val) return;
+      setWilliamPass(val);
+      document.getElementById('new-william-pass').value = '';
+      passDisplay.value = val;
+
+      const msg = document.getElementById('pass-msg');
+      msg.style.display = 'block';
+      msg.textContent = `✅ Password updated to "${val}". Tell William!`;
+      setTimeout(() => msg.style.display = 'none', 4000);
+    });
+
+    // ── Save admin password ────────────────────────────────────────────────────
+    document.getElementById('save-admin-pass').addEventListener('click', () => {
+      const val = document.getElementById('new-admin-pass').value.trim();
+      if (!val) return;
+      setAdminPass(val);
+      document.getElementById('new-admin-pass').value = '';
+
+      const msg = document.getElementById('admin-pass-msg');
+      msg.style.display = 'block';
+      msg.textContent = '✅ Admin password updated. Use it next time you log in.';
+      setTimeout(() => msg.style.display = 'none', 4000);
+    });
+
+    // ── Reset progress ─────────────────────────────────────────────────────────
+    document.getElementById('reset-btn').addEventListener('click', () => {
+      if (confirm('Are you sure? This will delete ALL of William\'s scores and badges. This cannot be undone.')) {
+        resetProgress();
+        loadAdminData();
+        alert('Progress has been reset.');
+      }
+    });
+
+    // ── Logout ────────────────────────────────────────────────────────────────
+    document.getElementById('logout-btn').addEventListener('click', () => {
+      clearSession();
+      location.href = 'index.html';
+    });
+  </script>
+</body>
+</html>
